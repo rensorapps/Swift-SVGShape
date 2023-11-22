@@ -2,31 +2,45 @@
 import SwiftUI
 
 struct SVGShape: Shape {
-    var document: XMLDocument
-    let fallback = Path()
+    private var polygons: [[CGPoint]]
     
-    init(document: XMLDocument) {
-        self.document = document
+    init(points: [[CGPoint]]) {
+        polygons = points
+    }
+
+    static func error(_ s: String) -> DecodingError {
+        return DecodingError.dataCorrupted(.init(codingPath: .init(), debugDescription: s))
+    }
+    
+    init(document: XMLDocument) throws {
+        polygons = []
+        let ns = try document.nodes(forXPath: "//polygon")
+        for n in ns {
+            var polypoints: [CGPoint] = []
+            guard let e = n as? XMLElement else { throw SVGShape.error("Found non-element polygon") }
+            guard let a = e.attribute(forName: "points") else { throw SVGShape.error("No points found for polygon") }
+            guard let v = a.stringValue else { throw SVGShape.error("No value found for polygon points") }
+            for m in v.matches(of: /(?<x>\d+(\.\d+)?),(?<y>\d+(\.\d+)?)/) {
+                let o = m.output
+                let x = (String(o.x) as NSString).floatValue
+                let y = (String(o.y) as NSString).floatValue
+                let p = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                polypoints.append(p)
+            }
+            polygons.append(polypoints)
+        }
     }
     
     init(string: String) throws {
         let x = try XMLDocument(xmlString: string)
-        self.init(document: x)
+        try self.init(document: x)
     }
 
     func path(in rect: CGRect) -> Path {
         var paths = Path()
-        guard let ns = try? document.nodes(forXPath: "//polygon") else { return fallback }
-        for n in ns {
-            guard let e = n as? XMLElement else { return fallback }
-            guard let a = e.attribute(forName: "points") else { return fallback }
-            guard let v = a.stringValue else { return fallback }
+        for g in polygons {
             let subpath = Path { path in
-                for (i,m) in v.matches(of: /(?<x>\d+(\.\d+)?),(?<y>\d+(\.\d+)?)/).enumerated() {
-                    let o = m.output
-                    let x = (String(o.x) as NSString).floatValue
-                    let y = (String(o.y) as NSString).floatValue
-                    let p = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                for (i,p) in g.enumerated() {
                     if(i < 1) {
                         path.move(to: p)
                     } else {
@@ -61,7 +75,7 @@ struct SVGShape: Shape {
               Sorry, your browser does not support inline SVG.
             </svg>
         """
-        SVGShape(string: svgString)
+        try! SVGShape(string: svgString)
     }
 }
 
