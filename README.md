@@ -19,7 +19,7 @@ Example:
 }
 ```
 
-![image](https://github.com/rensorapps/Swift-SVGShape/assets/92299/b5421118-3d5b-4a95-8651-73d2420d946e)
+![image](https://github.com/rensorapps/Swift-SVGShape/assets/92299/76a8b145-7bf1-4913-802c-2385fead1ef5)
 
 ## Package Dependency
 
