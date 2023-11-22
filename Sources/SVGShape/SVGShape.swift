@@ -2,7 +2,7 @@
 import SwiftUI
 
 struct SVGShape: Shape {
-    private var polygons: [[CGPoint]]
+    private var polygons: [[CGPoint]] = []
     
     init(points: [[CGPoint]]) {
         polygons = points
