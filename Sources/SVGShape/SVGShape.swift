@@ -10,7 +10,7 @@ struct SVGShape: Shape {
     }
     
     init(string: String) throws {
-        guard let x = try? XMLDocument(xmlString: string) else { throw DecodingError.dataCorrupted(.init(codingPath: .init(), debugDescription: "Oops!")) }
+        let x = try XMLDocument(xmlString: string)
         self.init(document: x)
     }
 
