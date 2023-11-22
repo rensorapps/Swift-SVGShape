@@ -19,6 +19,9 @@ Example:
 }
 ```
 
+![image](https://github.com/rensorapps/Swift-SVGShape/assets/92299/b5421118-3d5b-4a95-8651-73d2420d946e)
+
+
 ## Limitations
 
 * Currently only supports polygon paths.
