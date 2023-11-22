@@ -21,6 +21,24 @@ Example:
 
 ![image](https://github.com/rensorapps/Swift-SVGShape/assets/92299/b5421118-3d5b-4a95-8651-73d2420d946e)
 
+## Package Dependency
+
+
+```swift
+let package = Package(
+    ...
+    products: ...
+    dependencies: [
+        .package(url: "https://github.com/rensorapps/Swift-SVGShape.git", from: "v0.1") // CHOOSE THE BEST TAG FOR YOU!
+    ],
+    targets: [
+        .target(
+            ...
+            dependencies: [
+                .product(name: "SVGShape", package: "SVGShape")
+        ...
+```
+
 
 ## Limitations
 
