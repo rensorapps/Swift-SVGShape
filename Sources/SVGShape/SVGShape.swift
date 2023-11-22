@@ -12,6 +12,7 @@ struct SVGShape: Shape {
         return DecodingError.dataCorrupted(.init(codingPath: .init(), debugDescription: s))
     }
     
+    // See: https://www.w3.org/TR/SVG2/shapes.html
     init(document: XMLDocument) throws {
         polygons = []
         let ns = try document.nodes(forXPath: "//polygon")
@@ -68,14 +69,19 @@ struct SVGShape: Shape {
 
 #Preview {
     VStack {
-        let svgString = """
-            <svg height="210" width="500">
-              <polygon points="90,10 40,198 190,78 10,78 160,198" />
-              <polygon points="1110,10 1040,198 1190,78 1010,78 1160,198" />
-              <polygon points="1110,210 1040,398 1190,278 1010,278 1160,398" />
-              Sorry, your browser does not support inline SVG.
-            </svg>
-        """
+        let svgString
+            = """
+                <svg height="210" width="500">
+                    <polygon points="90,10 40,198 190,78 10,78 160,198" />
+                    <polygon points="1110,10 1040,198 1190,78 1010,78 1160,198" />
+                    <polygon points="1110,210 1040,398 1190,278 1010,278 1160,398" />
+                    <polygon points="420,10 500,210 370,250 323,234" />
+                    <polygon points="200,210 140,398 290,278 110,278 260,398" />
+                    <polygon points="600,200 650,125 650,175 700,100" fill="none" stroke="black" />
+            
+                    Sorry, your browser does not support inline SVG.
+                </svg>
+            """
         try! SVGShape(string: svgString)
     }
 }
