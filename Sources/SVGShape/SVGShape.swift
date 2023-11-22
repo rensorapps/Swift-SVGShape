@@ -8,7 +8,7 @@ struct SVGShape: Shape {
         polygons = points
     }
 
-    static func error(_ s: String) -> DecodingError {
+    private func error(_ s: String) -> DecodingError {
         return DecodingError.dataCorrupted(.init(codingPath: .init(), debugDescription: s))
     }
     
@@ -17,9 +17,9 @@ struct SVGShape: Shape {
         let ns = try document.nodes(forXPath: "//polygon")
         for n in ns {
             var polypoints: [CGPoint] = []
-            guard let e = n as? XMLElement else { throw SVGShape.error("Found non-element polygon") }
-            guard let a = e.attribute(forName: "points") else { throw SVGShape.error("No points found for polygon") }
-            guard let v = a.stringValue else { throw SVGShape.error("No value found for polygon points") }
+            guard let e = n as? XMLElement else { throw error("Found non-element polygon") }
+            guard let a = e.attribute(forName: "points") else { throw error("No points found for polygon") }
+            guard let v = a.stringValue else { throw error("No value found for polygon points") }
             for m in v.matches(of: /(?<x>\d+(\.\d+)?),(?<y>\d+(\.\d+)?)/) {
                 let o = m.output
                 let x = (String(o.x) as NSString).floatValue
