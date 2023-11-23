@@ -45,4 +45,5 @@ let package = Package(
 
 ## Limitations
 
-* Currently only supports polygon paths.
+* Currently only supports polygon and curves - (S,C not currently supported)
+
