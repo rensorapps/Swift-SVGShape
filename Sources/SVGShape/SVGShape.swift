@@ -27,6 +27,7 @@ extension Array {
 public struct SVGShape: Shape {
     private var polygons: [[CGPoint]] = []
     private var paths: [[Command]] = []
+    private var circles: [SVGCircle] = []
     
     public enum Command: Sendable {
         case moveTo(CGPoint)                        // MoveTo: M, m
@@ -38,9 +39,35 @@ public struct SVGShape: Shape {
         case ellipticalCurve(CGPoint, CGPoint)      // Elliptical Arc Curve: A, a
         case closePath                              // ClosePath: Z, z
     }
-
+    
+    public struct SVGCircle: Sendable {
+        var point: CGPoint
+        var radius: CGFloat
+    }
+    
     private static func error(_ s: String) -> DecodingError {
         return DecodingError.dataCorrupted(.init(codingPath: .init(), debugDescription: s))
+    }
+    
+    private static func parseCircle(_ n: XMLNode) throws -> SVGCircle {
+        guard let e = n as? XMLElement else { throw error("Found non-element circle") }
+        
+        guard let cx = e.attribute(forName: "cx"),
+              let sx = cx.stringValue
+          else { throw error("No x found for circle") }
+        let x = CGFloat((sx as NSString).floatValue)
+        
+        guard let cy = e.attribute(forName: "cy"),
+              let sy = cy.stringValue
+          else { throw error("No y found for circle") }
+        let y = CGFloat((sy as NSString).floatValue)
+
+        guard let cr = e.attribute(forName: "r"),
+              let sr = cr.stringValue
+          else { throw error("No r found for circle") }
+        let r = CGFloat((sr as NSString).floatValue)
+
+        return SVGCircle(point: CGPoint(x: x, y: y), radius: r)
     }
     
     private static func parsePolygon(_ n: XMLNode) throws -> [CGPoint] {
@@ -67,6 +94,7 @@ public struct SVGShape: Shape {
         }
     }
 
+    // From: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d
     private static func parsePath(_ n: XMLNode) throws -> [Command] {
         var commands: [Command] = []
         
@@ -219,9 +247,6 @@ public struct SVGShape: Shape {
         return commands
     }
     
-    private static func parseCircle() {
-    }
-    
     private static func drawPolygon() { // -> Path
     }
     
@@ -249,6 +274,12 @@ public struct SVGShape: Shape {
         for n in pathNodes {
             if let p = try? Self.parsePath(n) {
                 paths.append(p)
+            }
+        }
+        let circleNodes = try document.nodes(forXPath: "//circle")
+        for c in circleNodes {
+            if let p = try? Self.parseCircle(c) {
+                circles.append(p)
             }
         }
     }
@@ -289,6 +320,13 @@ public struct SVGShape: Shape {
                         print("Unrecognised command: \(c)")
                     }
                 }
+            }
+            path.addPath(subpath)
+        }
+        
+        for c in circles {
+            let subpath = Path { p in
+                p.addArc(center: c.point, radius: c.radius, startAngle: Angle(degrees: 0), endAngle: Angle(degrees: 360), clockwise: true)
             }
             path.addPath(subpath)
         }
@@ -335,6 +373,22 @@ public struct SVGShape: Shape {
                     <path d="m47 50.9-7-10.8c-1.1-1.8-3.4-2.3-5.2-1.2-1.1.7-1.8 1.9-1.8 3.2 0 .7.2 1.4.6 2l4.7 7.4c.4.6.2 1.3-.1 1.8l-7.4 8.1c-1.4 1.5-1.3 3.9.2 5.3.7.6 1.7.9 2.6.9 1.1 0 2-.5 2.7-1.2l5.5-6.4c.5-.5 1.2-.5 1.5.1l3.9 5.6c.2.5.6.8 1.1 1.1 1.3.9 3 .9 4.3.1 1.1-.7 1.8-1.9 1.8-3.2 0-.7-.2-1.4-.6-2z"/>
                 </g>
             </svg>
+            """
+        try! SVGShape(string: svgString)
+    }
+}
+
+#Preview {
+    VStack {
+        let svgString
+            = """
+                <svg xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 85 95" viewBox="0 0 85 95">
+                  <g fill="#102954">
+                    <path
+                      d="m79.9 31.8c2.6-6.3 2.6-19.1-.8-28.9-.9-1.8-3.6-1.2-3.7.7v.7c-.6 9.4-4 14.5-9.1 17-.8.4-2.1.4-3-.2-6-3.8-13.2-6-20.9-6s-14.8 2.3-20.9 6c-.8.5-1.8.6-2.6.2-5.2-1.9-8.8-7.6-9.4-17.1v-.7c0-1.9-2.8-2.5-3.6-.7-3.4 10-3.3 22.8-.8 29 1.3 3.1 1.3 6.6.2 9.8-1.4 4-2.1 8.5-2 13 .5 20.6 18 38.2 38.7 38.5 21.8.4 39.5-17.1 39.5-39 0-4.4-.7-8.5-2-12.4-1-3.2-.9-6.8.4-9.9zm-38 52.1c-15.8-.4-28.9-13.3-29.1-29.2-.4-16.9 13.4-30.7 30.2-30.3 15.9.2 28.9 13.3 29.2 29.2.3 16.8-13.4 30.5-30.3 30.3z" />
+                    <circle cx="42.73" cy="53.95" r="28" />
+                  </g>
+                </svg>
             """
         try! SVGShape(string: svgString)
     }
