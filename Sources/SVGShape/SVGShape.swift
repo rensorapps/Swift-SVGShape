@@ -1,10 +1,10 @@
 
 import SwiftUI
 
-struct SVGShape: Shape {
+public struct SVGShape: Shape {
     private var polygons: [[CGPoint]] = []
     
-    init(points: [[CGPoint]]) {
+    public init(points: [[CGPoint]]) {
         polygons = points
     }
 
@@ -13,7 +13,7 @@ struct SVGShape: Shape {
     }
     
     // See: https://www.w3.org/TR/SVG2/shapes.html
-    init(document: XMLDocument) throws {
+    public init(document: XMLDocument) throws {
         polygons = []
         let ns = try document.nodes(forXPath: "//polygon")
         for n in ns {
@@ -32,12 +32,12 @@ struct SVGShape: Shape {
         }
     }
     
-    init(string: String) throws {
+    public init(string: String) throws {
         let x = try XMLDocument(xmlString: string)
         try self.init(document: x)
     }
 
-    func path(in rect: CGRect) -> Path {
+    public func path(in rect: CGRect) -> Path {
         var paths = Path()
         for g in polygons {
             let subpath = Path { path in
