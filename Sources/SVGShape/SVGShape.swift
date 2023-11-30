@@ -24,6 +24,49 @@ extension Array {
     }
 }
 
+func + (lhs: CGPoint, rhs: CGPoint) -> CGPoint {
+    return CGPoint(x: lhs.x + rhs.x, y: lhs.y + rhs.y)
+}
+
+func - (lhs: CGPoint, rhs: CGPoint) -> CGPoint {
+    return CGPoint(x: lhs.x - rhs.x, y: lhs.y - rhs.y)
+}
+
+func / (lhs: CGPoint, rhs: CGFloat) -> CGPoint {
+    return CGPoint(x: lhs.x / rhs, y: lhs.y / rhs)
+}
+
+extension CGPoint {
+    func rotated(_ angle: Angle) -> CGPoint {
+        let a = CGFloat(angle.radians)
+        let rotatedX = self.x * cos(a) - self.y * sin(a)
+        let rotatedY = self.x * sin(a) + self.y * cos(a)
+        return CGPoint(x: rotatedX, y: rotatedY)
+    }
+    
+    func scaled(_ factor: CGFloat) -> CGPoint {
+        return CGPoint(x: self.x * factor, y: self.y * factor)
+    }
+    
+    func scaled(_ factor: CGPoint) -> CGPoint {
+        let scaledX = self.x * factor.x
+        let scaledY = self.y * factor.y
+        return CGPoint(x: scaledX, y: scaledY)
+    }
+    
+    var magnitude: CGFloat {
+        sqrt(pow(self.x,2) + pow(self.y,2))
+    }
+    
+    var angle: Angle {
+        Angle(radians: atan(self.y/self.x))
+    }
+    
+    var unit: CGPoint {
+        self.scaled(1/self.magnitude)
+    }
+}
+
 public struct SVGShape: Shape {
     private var polygons: [[CGPoint]] = []
     private var paths: [[Command]] = []
@@ -36,7 +79,11 @@ public struct SVGShape: Shape {
                         ctrl1: CGPoint,
                         ctrl2: CGPoint)             // Cubic Bézier Curve: C, c, S, s
         case quadraticCurve(CGPoint, CGPoint)       // Quadratic Bézier Curve: Q, q, T, t
-        case ellipticalCurve(CGPoint, CGPoint)      // Elliptical Arc Curve: A, a
+        case ellipticalCurve(
+            CGPoint, CGPoint,
+            CGFloat, CGFloat,
+            Angle,
+            Bool, Bool)                             // Elliptical Arc Curve: A, a
         case closePath                              // ClosePath: Z, z
     }
     
@@ -211,7 +258,6 @@ public struct SVGShape: Shape {
                         let y = try an.get(3)
                         
                         if let lastCurvePoint {
-                            print(lastCurvePoint)
                             let dx = pos.x - lastCurvePoint.x
                             let dy = pos.y - lastCurvePoint.y
                             dx1 = pos.x + dx
@@ -228,6 +274,28 @@ public struct SVGShape: Shape {
                                 ctrl1: CGPoint(x: dx1, y: dy1),
                                 ctrl2: CGPoint(x: dx2, y: dy2)))
                     } catch { print("OOB - s: \(an)") }
+                }
+                
+            // case A
+            case "a":
+                for an in a.chunked(into: 7) {
+                    print(an) // TODO
+                    do {
+                        let rx       = try an.get(0)
+                        let ry       = try an.get(1)
+                        let angle    = try Angle(degrees: an.get(2))
+                        let largeArc = try an.get(3) == 1
+                        let sweep    = try an.get(4) == 1
+                        let x        = try an.get(5)
+                        let y        = try an.get(6)
+                        let previous = pos
+                        pos.x += x
+                        pos.y += y
+                        
+                        commands.append(
+                            Command.ellipticalCurve(previous, pos, rx, ry, angle, largeArc, sweep))
+                        
+                    } catch { print("OOB - a: \(an)") }
                 }
                 
             case "z":
@@ -314,6 +382,59 @@ public struct SVGShape: Shape {
                         p.addLine(to: a)
                     case .cubicCurve(let a, let c1, let c2):
                         p.addCurve(to: a, control1: c1, control2: c2)
+                    case .ellipticalCurve(let p1, let p2, let ra, let rb, let theta, let large, let sweep):
+                        
+                        print((p1,p2,ra,rb,theta,large,sweep))
+                        /*
+                         Draw an Arc curve from the current point to a point for which coordinates are those of the current point shifted by dx along the x-axis and dy along the y-axis. The center of the ellipse used to draw the arc is determined automatically based on the other parameters of the command:
+
+                         See: https://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+                         
+                         rx and ry are the two radii of the ellipse;
+                         angle represents a rotation (in degrees) of the ellipse relative to the x-axis;
+                         large-arc-flag and sweep-flag allows to chose which arc must be drawn as 4 possible arcs can be drawn out of the other parameters.
+                         large-arc-flag allows a choice of large arc (1) or small arc (0),
+                         sweep-flag allows a choice of a clockwise arc (1) or counterclockwise arc (0)
+                         */
+
+                        // translate p1 to the origin and find where p2 ends up
+                        let p2_translated = p2 - p1
+                        
+                        // rotate the ellipse back to zero
+                        let p2_rotated = p2_translated.rotated(-theta)
+                        
+                        // scale by minor and major axes
+                        let p2_scaled = p2_rotated.scaled(CGPoint(x:1/ra, y: 1/rb))
+                        
+                        // find the mid-point
+                        let mid_scaled = p2_scaled / 2
+                        
+                        // unit perpendicular
+                        let up = p2_scaled.rotated(Angle(degrees: large ? 90 : -90)).unit
+                        
+                        // scale up with trig calculation to find c
+                        let c_scaled = mid_scaled + up.scaled(sqrt(1 - pow(mid_scaled.magnitude,2)))
+                        
+                        let a_angle = (CGPoint(x: 0, y: 0) - c_scaled).angle
+                        let b_angle = (p2_scaled - c_scaled).angle
+                        
+                        // Draw a circle passing through the points,
+                        // then reverse everything back into an ellipse
+                        if large {
+                            p.addArc(
+                                center: c_scaled, radius: 1,
+                                startAngle: a_angle, endAngle: b_angle,
+                                clockwise: sweep,
+                                transform:
+                                    // unscale
+                                    // unrotate
+                                    // untranslate
+                                    .identity
+                                    .translatedBy(x: p1.x, y: p1.y)
+                                    //.rotated(by: theta.radians)
+                                    //.scaledBy(x: ra, y: rb)
+                            )
+                        }
                     case .closePath:
                         p.closeSubpath()
                     default:
@@ -343,6 +464,38 @@ public struct SVGShape: Shape {
         let deltaX = rect.midX - br2.midX
         let deltaY = rect.midY - br2.midY
         return path2.transform(CGAffineTransform(translationX: deltaX, y: deltaY)).path(in: rect)
+    }
+}
+
+#Preview {
+    VStack {
+        /*
+         let rx       = try an.get(0)
+         let ry       = try an.get(1)
+         let angle    = try Angle(degrees: an.get(2))
+         
+         let largeArc = try an.get(3) == 1
+         let sweep    = try an.get(4) == 1
+         
+         let x        = try an.get(5)
+         let y        = try an.get(6)
+         */
+        let svgString
+            = """
+               <svg height="210" width="500">
+                   <circle cx="0" cy="0" r="0.01" />
+                   <circle cx="0" cy="1" r="0.01" />
+                    
+                   <path d="M 0 0
+                    
+                            a 1 1  0
+                              1 0
+                              0 1
+                    
+                            z" />
+               </svg>
+            """
+        try! SVGShape(string: svgString)
     }
 }
 
@@ -388,6 +541,19 @@ public struct SVGShape: Shape {
                       d="m79.9 31.8c2.6-6.3 2.6-19.1-.8-28.9-.9-1.8-3.6-1.2-3.7.7v.7c-.6 9.4-4 14.5-9.1 17-.8.4-2.1.4-3-.2-6-3.8-13.2-6-20.9-6s-14.8 2.3-20.9 6c-.8.5-1.8.6-2.6.2-5.2-1.9-8.8-7.6-9.4-17.1v-.7c0-1.9-2.8-2.5-3.6-.7-3.4 10-3.3 22.8-.8 29 1.3 3.1 1.3 6.6.2 9.8-1.4 4-2.1 8.5-2 13 .5 20.6 18 38.2 38.7 38.5 21.8.4 39.5-17.1 39.5-39 0-4.4-.7-8.5-2-12.4-1-3.2-.9-6.8.4-9.9zm-38 52.1c-15.8-.4-28.9-13.3-29.1-29.2-.4-16.9 13.4-30.7 30.2-30.3 15.9.2 28.9 13.3 29.2 29.2.3 16.8-13.4 30.5-30.3 30.3z" />
                     <circle cx="42.73" cy="53.95" r="28" />
                   </g>
+                </svg>
+            """
+        try! SVGShape(string: svgString)
+    }
+}
+
+#Preview {
+    VStack {
+        let svgString
+            = """
+                <svg viewBox='0 0 102 102' xmlns='http://www.w3.org/2000/svg'>
+                  <path d='M24,58a28,28,0,1,1,55,0l21,4a50,50,0,1,0-97,1z' fill='#17b'/>
+                  <path d='M92,81c-24,3-44,10-56,18c5,2,10,3,15,3c17,0,32-8,41-21M95,76l3-7h-17c-29,0-55,5-69,13c3,4,6,8,10,10c15-9,42-16,73-16M71,62c10,0,20,1,28,4l1-4c-12-4-29-7-48-7c-20,0-37,3-49,8l3,10c15-7,40-12,65-11' fill='#d33'/>
                 </svg>
             """
         try! SVGShape(string: svgString)
